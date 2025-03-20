@@ -1,8 +1,14 @@
 import numpy as np
 from scipy import special as sp
 from scipy import spatial
+import scipy.integrate as spi
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import time
+
+# Supress warnings
+import warnings
+warnings.filterwarnings('ignore')
 
 # Definitions
 n = 2
@@ -179,7 +185,8 @@ def p(w, xk, k):
         # Invert to y
         J = np.matmul(J, J_Phi(*Gok_inv(w, xk, k)))
 
-        return np.abs(np.linalg.det(J))
+        density = np.abs(np.linalg.det(J))
+        return density if not np.isnan(density) else 0
     except np.linalg.LinAlgError:
         return 0
 
@@ -201,15 +208,15 @@ def sample_empirical(k : int, n_samples : int):
 
 
 ## Plot the distributions
-w_test = (1.5, 1.0)
 
+w_test = (1.5, 1.0)
 def plot_state_dist(ax :plt.Axes, k : int, resolution_x : int, resolution_w : int, x_bounds : np.ndarray, w_bounds : np.ndarray):
     #W0, W1, Xk0, Xk1 = np.meshgrid(np.linspace(w_bounds[0], w_bounds[1], resolution_w), 
     #                             np.linspace(w_bounds[2], w_bounds[3], resolution_w), 
     #                             np.linspace(x_bounds[0], x_bounds[1], resolution_x), 
     #                             np.linspace(x_bounds[2], x_bounds[3], resolution_x), indexing='ij')
     
-    # Test specific w #####################################3
+    # Test specific w #####################################
     W0, W1, Xk0, Xk1 = np.meshgrid(np.linspace(w_test[0], w_test[0], 1), 
                                  np.linspace(w_test[1], w_test[1], 1), 
                                  np.linspace(x_bounds[0], x_bounds[1], resolution_x), 
@@ -228,10 +235,10 @@ def plot_state_dist(ax :plt.Axes, k : int, resolution_x : int, resolution_w : in
 
     Xk0, Xk1 = np.meshgrid(np.linspace(x_bounds[0], x_bounds[1], resolution_x), np.linspace(x_bounds[2], x_bounds[3], resolution_x))
     ax.contourf(Xk0, Xk1, p_values_x.T, levels=50, cmap='viridis')
-    print("p_values_x: \n", p_values_x)
+    #print("p_values_x: \n", p_values_x)
     #ax.colorbar(label='p(x0, x1)')
     
-def plot_state_dist_empirical(ax :plt.Axes, k : int, n_samples : int, x_bounds : np.ndarray, w_bounds : np.ndarray):
+def plot_state_dist_empirical(ax :plt.Axes, k : int, n_samples : int, x_bounds : np.ndarray):
     xk_samples = sample_empirical(k, n_samples)
     ax.scatter(xk_samples[0, :], xk_samples[1, :], s=.05)
     ax.set_xlim((x_bounds[0], x_bounds[1]))
@@ -253,6 +260,8 @@ def plot_region(ax :plt.Axes, region : spatial.Rectangle):
 
     ax.add_patch(rect_patch)
 
+################################## INTEGRATION METHODS ##################################
+
 ## Monte Carlo Probability ##
 
 def mc_prob(region : spatial.Rectangle, k, n_samples):
@@ -267,16 +276,29 @@ def mc_prob(region : spatial.Rectangle, k, n_samples):
     # empirical probability
     return n_contained / n_samples
 
-def numerical_integral(region : spatial.Rectangle, k):
+## Numerical grid integration of the density ##
+
+def density_grid_integral(region : spatial.Rectangle, k, w_bounds : np.ndarray):
+    mins = np.append(region.mins, w_bounds[::2])
+    maxes = np.append(region.maxes, w_bounds[1::2])
+    bounds = [(l, u) for l, u in zip(mins, maxes)]
+    print("bounds: ", bounds)
+    options_x = {'epsabs': 1e-2, 'epsrel': 1e-2, 'limit': 20}  # Increase error tolerance, reduce subdivisions
+    options_w = {'epsabs': 1e-2, 'epsrel': 1e-2, 'limit': 100}  # Increase error tolerance, reduce subdivisions
+    options = [options_x, options_x, options_w, options_w]
+    return spi.nquad(lambda w0, w1, xk0, xk1: p((w0, w1), (xk0, xk1), k), bounds, opts=options)
+
+## Numerical grid sum of the volume ##
+def volume_grid_sum(region : spatial.Rectangle, k, w_bounds : np.ndarray):
     pass
 
 def main():
-    resolution_x = 30
-    resolution_w = 40
+    resolution_x = 20
+    resolution_w = 30
     n_plot_samples = 10000
-    n_int_samples = 100000
+    n_int_samples = 500000
     x_bounds = 3.0 * np.array([-1, 1, -1, 1])
-    w_bounds = -10.0 * np.array([-1, 1, -1, 1])
+    w_bounds = 1000.0 * np.array([-1, 1, -1, 1])
 
     K = 4
     fig, axes = plt.subplots(2, K)
@@ -286,9 +308,23 @@ def main():
     for k in range(0, K):
         print("Time step ", k, " out of ", K - 1)
         #plot_state_dist(axes[0, k], k, resolution_x, resolution_w, x_bounds, w_bounds)
-        plot_state_dist_empirical(axes[1, k], k, n_plot_samples, x_bounds, w_bounds)
+        plot_state_dist_empirical(axes[1, k], k, n_plot_samples, x_bounds)
         plot_region(axes[1, k], region)
-        print("   MC probability: ", mc_prob(region, k, n_int_samples))
+        
+
+        # Monte Carlo Probability
+        t_i = time.time()
+        P_mc = mc_prob(region, k, n_int_samples)
+        comp_time = time.time() - t_i
+        print("   MC probability:        ", P_mc, "   [", comp_time, "s]")
+
+        # Numerical integration of the density
+        t_i = time.time()
+        P_density = density_grid_integral(region, k, w_bounds)
+        comp_time = time.time() - t_i
+        print("   Density grid integral: ", P_density, "   [", comp_time, "s]")
+
+        # 
 
     plt.show()
 
