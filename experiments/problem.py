@@ -30,10 +30,10 @@ class Problem:
 
     # Sample states at time k 
     def sample_empirical(self, k : int, n_samples : int, w_test = None):
-        xk_samples = np.zeros((2, n_samples))
+        xk_samples = np.zeros((self.n, n_samples))
         for s in range(0, n_samples):
-            yw_rand = np.random.uniform(0, 1, 2)
-            yx_rand = np.random.uniform(0, 1, 2)
+            yw_rand = np.random.uniform(0, 1, self.m)
+            yx_rand = np.random.uniform(0, 1, self.n)
             if w_test:
                 w, x0 = self.Phi_inv(yw_rand, yx_rand)
                 w, xk = self.Gok(w_test, x0, k)

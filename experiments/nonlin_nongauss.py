@@ -165,8 +165,8 @@ def main():
 
     resolution_x = 20
     resolution_w = 20
-    resolution_yx = 20
-    resolution_yw = 20
+    resolution_yx = 30
+    resolution_yw = 30
     n_plot_samples = 10000
     n_int_samples = 100000
     x_bounds = 3.0 * np.array([-1, 1, -1, 1])
@@ -188,38 +188,35 @@ def main():
     fig, axes = plt.subplots(2, K)
     #fig.suptitle(f"w_test = {w_test}")
     for k in range(0, K):
-        # w test        
-        #print("p(w_test, x): ", p(w_test, (1.5, 0.5), k))
-
-        print("Time step ", k, " out of ", K - 1)
-        #plot_state_dist(axes[0, k], k, resolution_x, resolution_w, x_bounds, w_bounds, w_test=w_test)
+        print("\nTime step ", k, " out of ", K - 1)
+        #visualizers.plot_state_dist(axes[0, k], prob, k, resolution_x, resolution_w, x_bounds, w_bounds)#, w_test=w_test)
         visualizers.plot_state_dist_empirical(axes[1, k], prob, k, n_plot_samples, x_bounds)#, w_test=w_test)
         visualizers.plot_region(axes[1, k], region)
         
 
         # Monte Carlo Probability
-        #t_i = time.time()
-        #P_mc = integrators.mc_prob(prob, region, k, n_int_samples)
-        #comp_time = time.time() - t_i
-        #print("   MC probability:        ", P_mc, "   [", comp_time, "s]")
+        t_i = time.time()
+        P_mc = integrators.mc_prob(prob, region, k, n_int_samples)
+        comp_time = time.time() - t_i
+        print("   MC probability:        ", P_mc, "   [", comp_time, "s]")
 
-        ## Numerical grid integration of the density
-        #t_i = time.time()
-        #P_grid_density = density_grid_integral(prob, region, k, w_bounds)
-        #comp_time = time.time() - t_i
-        #print("   Density grid integral: ", P_grid_density, "   [", comp_time, "s]")
+        # Numerical grid integration of the density
+        t_i = time.time()
+        P_grid_density = integrators.density_grid_integral(prob, region, k, w_bounds)
+        comp_time = time.time() - t_i
+        print("   Density grid integral: ", P_grid_density, "   [", comp_time, "s]")
 
         # Numerical Monte Carlo integration of the density
-        #t_i = time.time()
-        #P_mc_density = integrators.density_mc_integral(prob, region, k, w_bounds)
-        #comp_time = time.time() - t_i
-        #print("   Density grid integral: ", P_mc_density, "   [", comp_time, "s]")
+        t_i = time.time()
+        P_mc_density = integrators.density_mc_integral(prob, region, k, w_bounds)
+        comp_time = time.time() - t_i
+        print("   Density mc integral:    ", P_mc_density, "   [", comp_time, "s]")
 
-        ## Grid sum of the volume
-        #t_i = time.time()
-        #P_vol = volume_grid_sum(prob, region, k, resolution_yx, resolution_yw)
-        #comp_time = time.time() - t_i
-        #print("   Volume grid sum:       ", P_vol, "   [", comp_time, "s]")
+        # Grid sum of the volume
+        t_i = time.time()
+        P_vol = integrators.volume_grid_sum(prob, region, k, resolution_yx, resolution_yw)
+        comp_time = time.time() - t_i
+        print("   Volume grid sum:       ", P_vol, "   [", comp_time, "s]")
     plt.show()
 
 if __name__ == "__main__":
