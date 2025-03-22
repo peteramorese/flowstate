@@ -21,17 +21,18 @@ a2 = 1/30
 a3 = 0.7
 
 # Useful functions
-def std_gaussian_quantile(x):
-    return np.sqrt(2) * sp.erfinv(2*x - 1)
+def std_gaussian_quantile(x, mu = 0, sigma = 1):
+    return mu + sigma * np.sqrt(2) * sp.erfinv(2*x - 1)
 
-def std_gaussian_cdf(x):
-    return 0.5 * (1 + sp.erf(x / np.sqrt(2)))
+def std_gaussian_cdf(x, mu = 0, sigma = 1):
+    return 0.5 * (1 + sp.erf((x - mu) / (sigma * np.sqrt(2))))
 
-def std_gaussian_quantile_deriv(x):
-    return 1 / (1 / np.sqrt(2 * np.pi) * np.exp(-(sp.erfinv(2*x - 1))**2))
+def std_gaussian_quantile_deriv(x, mu = 0, sigma = 1):
+    return np.sqrt(2 * np.pi) * sigma * np.exp(sp.erfinv(2*x - 1)**2)
 
-def std_gaussian_cdf_deriv(x):
-    return 1 / np.sqrt(2 * np.pi) * np.exp(-x**2 / 2)
+def std_gaussian_cdf_deriv(x, mu = 0, sigma = 1):
+    return 1 / (np.sqrt(2 * np.pi) * sigma) * np.exp(-(x - mu)**2 / (2 * sigma**2))
+
 
 ## Initial state and noise distribution cdf and quantiles ##
 

@@ -46,8 +46,6 @@ def plot_state_dist_empirical(ax :plt.Axes, prob : Problem, k : int, n_samples :
     ax.set_ylim((x_bounds[2], x_bounds[3]))
 
 def plot_region(ax :plt.Axes, region : spatial.Rectangle):
-    # Make sure the region is just over x
-    assert region.m == 2
 
     rect_patch = patches.Rectangle(
         region.mins,  # Bottom-left corner (x_min, y_min)

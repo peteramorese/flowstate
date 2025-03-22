@@ -50,11 +50,14 @@ def volume_grid_sum(prob : Problem, region : spatial.Rectangle, k, resolution_yx
 
     volume = 0
 
-    for idx in np.ndindex((resolution_yw - 1, resolution_yw - 1, resolution_yx - 1, resolution_yx - 1)):
+    for idx in np.ndindex(tuple(prob.m * [resolution_yw - 1] + prob.n * [resolution_yx - 1])):
         yw = tuple(YWi[idx] for YWi in YWX[:prob.m])
         yx = tuple(YXi[idx] for YXi in YWX[prob.m:])
+        #print("yx shape: ", yx.shape)
         w, xk = prob.Gok(*prob.Phi_inv(yw, yx), k)
+        #print("xk: ", xk)
         xk = np.array(xk)
+        #print("region.mins: ", region.mins, ", xk: ", xk)
         if np.all((region.mins <= xk) & (region.maxes >= xk)):
             next_idx = tuple(np.array(idx) + 1)
             
