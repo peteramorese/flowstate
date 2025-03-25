@@ -8,6 +8,7 @@ import time
 import vegas
 
 from problem import Problem
+from distribution_functions import laplace_cdf, laplace_quantile, laplace_cdf_deriv, laplace_quantile_deriv
 import visualizers, integrators
 
 # Supress warnings
@@ -23,28 +24,6 @@ np.random.seed(17)
 A = np.random.uniform(-1, 2, (n, n)) #+ np.random.uniform(1, 2, (n, n))
 A_inv = np.linalg.inv(A)
 
-
-# Useful functions
-def laplace_quantile(x, mu = 0, b = 1):
-    if x <= 0.5:
-        return mu + b * np.log(2 * x) 
-    else:
-        return mu - b * np.log(2 - 2 * x) 
-
-def laplace_cdf(x, mu = 0, b = 1):
-    if x <= mu:
-        return 0.5 * np.exp(1 / b * (x - mu))
-    else:
-        return 1 - 0.5 * np.exp(-1 / b * (x - mu))
-
-def laplace_quantile_deriv(x, mu = 0, b = 1):
-    if x <= 0.5:
-        return b / x
-    else:
-        return -b / (1 - x)
-
-def laplace_cdf_deriv(x, mu = 0, b = 1):
-    return 0.5 * np.exp(1 / b * (x - mu))
 
 ## Initial state and noise distribution cdf and quantiles ##
 

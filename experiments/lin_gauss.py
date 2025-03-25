@@ -8,7 +8,9 @@ import time
 import vegas
 
 from problem import Problem
+from distribution_functions import std_gaussian_cdf, std_gaussian_quantile, std_gaussian_cdf_deriv, std_gaussian_quantile_deriv
 import visualizers, integrators
+import bounds
 
 # Supress warnings
 import warnings
@@ -23,19 +25,6 @@ np.random.seed(17)
 A = np.random.uniform(-1, 2, (n, n)) #+ np.random.uniform(1, 2, (n, n))
 A_inv = np.linalg.inv(A)
 
-
-# Useful functions
-def std_gaussian_quantile(x):
-    return np.sqrt(2) * sp.erfinv(2*x - 1)
-
-def std_gaussian_cdf(x):
-    return 0.5 * (1 + sp.erf(x / np.sqrt(2)))
-
-def std_gaussian_quantile_deriv(x):
-    return 1 / (1 / np.sqrt(2 * np.pi) * np.exp(-(sp.erfinv(2*x - 1))**2))
-
-def std_gaussian_cdf_deriv(x):
-    return 1 / np.sqrt(2 * np.pi) * np.exp(-x**2 / 2)
 
 ## Initial state and noise distribution cdf and quantiles ##
 
@@ -123,6 +112,19 @@ def J_Phi(w, x0):
 def main():
     prob = Problem(n, m, g, g_inv, Phi, Phi_inv, J_Ginv, J_Phi)    
 
+    propagator = bounds.GaussianCellPropagator(prob, 1.5)
+
+    init_cell = spatial.Rectangle([0, 0, -10, -10], [1, 1, 10, 10])
+    init_state_cell = spatial.Rectangle([0, 0], [1, 1])
+    post_state_cell = propagator.propagate_state_cell(init_cell, 1)
+
+    fig = plt.figure()
+    ax = fig.gca()
+    visualizers.plot_region(ax, init_cell)
+    visualizers.plot_region(ax, post_state_cell)
+
+    plt.show()
+    return
     resolution_x = 20
     resolution_w = 20
     resolution_yx = 40

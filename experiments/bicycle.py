@@ -8,6 +8,7 @@ import time
 import vegas
 
 from problem import Problem
+from distribution_functions import std_gaussian_cdf, std_gaussian_quantile, std_gaussian_cdf_deriv, std_gaussian_quantile_deriv
 import visualizers, integrators
 
 # Supress warnings
@@ -38,19 +39,6 @@ y_sigma = 0.3
 theta_sigma = 0.3
 velocity_sigma = 1.5
 steering_angle_sigma = 0.5
-
-# Useful functions
-def std_gaussian_quantile(x, mu = 0, sigma = 1):
-    return mu + sigma * np.sqrt(2) * sp.erfinv(2*x - 1)
-
-def std_gaussian_cdf(x, mu = 0, sigma = 1):
-    return 0.5 * (1 + sp.erf((x - mu) / (sigma * np.sqrt(2))))
-
-def std_gaussian_quantile_deriv(x, mu = 0, sigma = 1):
-    return np.sqrt(2 * np.pi) * sigma * np.exp(sp.erfinv(2*x - 1)**2)
-
-def std_gaussian_cdf_deriv(x, mu = 0, sigma = 1):
-    return 1 / (np.sqrt(2 * np.pi) * sigma) * np.exp(-(x - mu)**2 / (2 * sigma**2))
 
 ## Initial state and noise distribution cdf and quantiles ##
 
@@ -228,10 +216,10 @@ def main():
     #for idx in np.ndindex(w_test_0.shape):
     #    w_test = (w_test_0[idx], w_test_1[idx])
 
-    K = 10
+    K = 4
     fig, axes = plt.subplots(1, K)
     #fig.suptitle(f"w_test = {w_test}")
-    for k in range(0, K):
+    for k in range(0, 2*K, 2):
         print("\nTime step ", k, " out of ", K - 1)
         #visualizers.plot_state_dist(axes[0, k], prob, k, resolution_x, resolution_w, x_bounds, w_bounds)#, w_test=w_test)
         #visualizers.plot_state_dist_empirical(axes[1, k], prob, k, n_plot_samples, x_bounds)#, w_test=w_test)
