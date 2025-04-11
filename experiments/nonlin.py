@@ -138,25 +138,63 @@ def G(w, x):
 def G_inv(w, xp):
     return (w, g_inv(w, xp))
 
+#def J_Ginv(w, xp):
+#    sz = len(w) + len(xp)
+#    J = np.zeros((sz, sz))
+#    
+#    # dw0/dw0
+#    J[0, 0] = 1
+#
+#    # dw1/dw1
+#    J[1, 1] = 1
+#
+#    # dg0inv/dw0
+#    dg0inv_dw0 = (w[1]**2 - xp[0]) * np.cos(w[0]) * np.cosh((w[1]**2 - xp[0]) / (a1 * (np.sin(w[0]) + 2))) / (a1 * (np.sin(w[0]) + 2))**2
+#    J[2, 0] = dg0inv_dw0
+#
+#    # dg0inv/dw1
+#    J[2, 1] = 2 * w[1] * np.cosh((w[1]**2 - xp[0]) / (a1 * (np.sin(w[0]) + 2))) / (a1 * (np.sin(w[0]) + 2))
+#
+#    # dg0inv/dx0
+#    J[2, 2] = np.cosh((w[1]**2 - xp[0]) / (a1 * (np.sin(w[0]) + 2))) / (a1 * (np.sin(w[0]) + 2))
+#
+#    # dg0inv/dx1
+#    J[2, 3] = 0
+#
+#    # dg1inv/dw0
+#    J[3, 0] = -4 * w[0] / (w[0] + 2)**2 * (xp[1] - a2 * g_inv(w, xp)[0]**4 - a3 * np.sin(2 * g_inv(w, xp)[0])) * 
+#
+#    # dg1inv/dw1
+#    J[3, 1] = 0
+#
+#    # dg1inv/dx0
+#    J[3, 2] = a2 * 4 * x[0]**3 + 2 * a3 * np.cos(2 * x[0])
+#
+#    # dg1inv/dx1
+#    J[3, 3] = (w[0]**2 + 1) / 2
+#
+#    return J
 
 # For now use matrix inverse cus im lazy
 def J_Ginv(w, xp):
     return np.linalg.inv(J_G(*G_inv(w, xp)))
 
+
 # For now use matrix inverse cus im lazy
 def J_Phi(w, x0):
     return np.linalg.inv(J_Phiinv(*Phi(w, x0)))
 
+prob = Problem(2, 2, g, g_inv, Qx0, Qw, Phi, Phi_inv, J_Ginv, J_Phi)    
+
 def main():
-    n, m = 2, 2
-    prob = Problem(n, m, g, g_inv, Phi, Phi_inv, J_Ginv, J_Phi)    
+    #prob = Problem(n, m, g, g_inv, Qx0, Qw, Phi, Phi_inv, J_Ginv, J_Phi)    
 
     resolution_x = 20
     resolution_w = 20
-    resolution_yx = 30
-    resolution_yw = 30
+    resolution_yx = 40
+    resolution_yw = 40
     n_plot_samples = 10000
-    n_int_samples = 100000
+    n_int_samples = 1000000
     x_bounds = 3.0 * np.array([-1, 1, -1, 1])
     w_bounds = 3.0 * np.array([-1, 1, -1, 1])
 
@@ -188,23 +226,29 @@ def main():
         comp_time = time.time() - t_i
         print("   MC probability:        ", P_mc, "   [", comp_time, "s]")
 
-        # Numerical grid integration of the density
-        t_i = time.time()
-        P_grid_density = integrators.density_grid_integral(prob, region, k, w_bounds)
-        comp_time = time.time() - t_i
-        print("   Density grid integral: ", P_grid_density, "   [", comp_time, "s]")
+        ## Adaptive quadrature integration of the density
+        #t_i = time.time()
+        #P_grid_density = integrators.density_AQ_integral(prob, region, k, w_bounds)
+        #comp_time = time.time() - t_i
+        #print("   Density grid integral: ", P_grid_density, "   [", comp_time, "s]")
 
-        # Numerical Monte Carlo integration of the density
-        t_i = time.time()
-        P_mc_density = integrators.density_mc_integral(prob, region, k, w_bounds)
-        comp_time = time.time() - t_i
-        print("   Density mc integral:    ", P_mc_density, "   [", comp_time, "s]")
+        ## Numerical Monte Carlo integration of the density
+        #t_i = time.time()
+        #P_mc_density = integrators.density_mc_integral(prob, region, k, w_bounds)
+        #comp_time = time.time() - t_i
+        #print("   Density mc integral:    ", P_mc_density, "   [", comp_time, "s]")
 
         # Grid sum of the volume
         t_i = time.time()
         P_vol = integrators.volume_grid_sum(prob, region, k, resolution_yx, resolution_yw)
         comp_time = time.time() - t_i
         print("   Volume grid sum:       ", P_vol, "   [", comp_time, "s]")
+
+        # Numerical grid integration of the density
+        t_i = time.time()
+        P_grid_density = integrators.density_grid_sum(prob, region, k, resolution_yx, resolution_yw)
+        comp_time = time.time() - t_i
+        print("   Density grid sum:      ", P_grid_density, "   [", comp_time, "s]")
     plt.show()
 
 if __name__ == "__main__":

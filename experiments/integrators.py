@@ -21,7 +21,7 @@ def mc_prob(prob : Problem, region : spatial.Rectangle, k, n_samples):
 
 ## Numerical grid integration of the density ##
 
-def density_grid_integral(prob : Problem, region : spatial.Rectangle, k, w_bounds : np.ndarray):
+def density_AQ_integral(prob : Problem, region : spatial.Rectangle, k, w_bounds : np.ndarray):
     mins = np.append(w_bounds[::2], region.mins)
     maxes = np.append(w_bounds[1::2], region.maxes)
     bounds = [(l, u) for l, u in zip(mins, maxes)]
@@ -70,3 +70,34 @@ def volume_grid_sum(prob : Problem, region : spatial.Rectangle, k, resolution_yx
             volume += d_volume
     return volume
 
+## Density grid sum ##
+
+def density_grid_sum(prob : Problem, region : spatial.Rectangle, k, resolution_xk : int, resolution_yw : int, epsilon = 1e-10):
+    yw_linspace = np.linspace(0 + 1e-10, 1 - 1e-10, resolution_yw)
+    w_linspaces = list()
+    for i in range(0, prob.m):
+        wi_linspace = [prob.Qw(prob.m * (yw,))[i] for yw in yw_linspace]
+        w_linspaces.append(wi_linspace)
+
+    xk_linspaces = [np.linspace(region.mins[i], region.maxes[i], resolution_xk) for i in range(0, prob.n)]
+
+    linspaces = w_linspaces + xk_linspaces
+
+    #linspaces = prob.m * [np.linspace(0, 1, resolution_w)] + prob.n * [np.linspace(0, 1, resolution_x)]
+    WXk = np.meshgrid(*linspaces, indexing='ij')
+
+    mass = 0
+
+    for idx in np.ndindex(tuple(prob.m * [resolution_yw - 1] + prob.n * [resolution_xk - 1])):
+        w = tuple(Wi[idx] for Wi in WXk[:prob.m])
+        xk = tuple(Xki[idx] for Xki in WXk[prob.m:])
+        
+        next_idx = tuple(np.array(idx) + 1)
+        # Compute the volume of the cell
+        d_volume = 1
+        for mesh in WXk:
+            d_volume *= mesh[next_idx] - mesh[idx]
+
+        mass += d_volume * prob.p(w, xk, k)
+
+    return mass

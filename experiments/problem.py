@@ -4,11 +4,13 @@ from scipy import spatial
 from typing import Callable
 
 class Problem:
-    def __init__(self, n : int, m : int, g : Callable, g_inv : Callable, Phi : Callable, Phi_inv : Callable, J_Ginv : Callable, J_Phi):
+    def __init__(self, n : int, m : int, g : Callable, g_inv : Callable, Qx0 : Callable, Qw : Callable, Phi : Callable, Phi_inv : Callable, J_Ginv : Callable, J_Phi):
         self.n = n
         self.m = m
         self.g = g
         self.g_inv = g_inv
+        self.Qx0 = Qx0
+        self.Qw = Qw
         self.Phi = Phi
         self.Phi_inv = Phi_inv
         self.J_Ginv = J_Ginv

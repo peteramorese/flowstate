@@ -193,7 +193,7 @@ def simulate_mc(ax :plt.Axes, prob : Problem, k : int, n_samples : int, position
 
 def main():
     n, m = 3, 2
-    prob = Problem(n, m, g, g_inv, Phi, Phi_inv, J_Ginv, J_Phi)    
+    prob = Problem(n, m, g, g_inv, Qx0, Qw, Phi, Phi_inv, J_Ginv, J_Phi)    
 
     resolution_x = 20
     resolution_w = 20
@@ -235,7 +235,7 @@ def main():
 
         # Numerical grid integration of the density
         t_i = time.time()
-        P_grid_density = integrators.density_grid_integral(prob, region, k, w_bounds)
+        P_grid_density = integrators.density_AQ_integral(prob, region, k, w_bounds)
         comp_time = time.time() - t_i
         print("   Density grid integral: ", P_grid_density, "   [", comp_time, "s]")
 
