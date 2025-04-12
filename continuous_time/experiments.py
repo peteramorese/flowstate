@@ -93,12 +93,14 @@ if __name__ == "__main__":
     x = sp.symbols('x:2')
     t = sp.symbols('t')
 
-    u0 = -1/3 * x[1]**3 + .1 * x[1] * x[0]
-    u1 = 1/2 * x[0]**2 + x[1]**3 * x[0]
+    #u0 = -1/3 * x[1]**3 + .1 * x[1] * x[0]
+    #u1 = 1/2 * x[0]**2 + x[1]**3 * x[0]
+    u0 = 2*sp.erf(x[1]) 
+    u1 = sp.atan(1/5 * x[0] * x[1])
 
     vf = VelocityField(x, [u0, u1])
 
-    dt = 0.5
+    dt = 0.1
 
     initial_region = Rectangle([0.3, -0.3], [0.2, -0.4])
     integral_result = vf.volume_time_derivative(initial_region)
@@ -107,14 +109,16 @@ if __name__ == "__main__":
     fig = plt.figure()
     ax = fig.gca()
 
+    fig_bounds = 5*np.array([-1, 1, -1, 1])
+
     # Show the v field
-    vf.visualize(ax, [-1, 1, -1, 1])
+    vf.visualize(ax, fig_bounds)
 
     # Show the initial region
     show_2D_region(ax, initial_region, color='red')
     tf_region = RegionBoundaryDiscretization(initial_region, n=20)
 
-    timesteps = 2
+    timesteps = 10
     for _ in range(timesteps):
         tf_region.flow(vf, dt)
         show_2D_transformed_region(ax, tf_region=tf_region, color='red')
@@ -123,6 +127,6 @@ if __name__ == "__main__":
     fig = plt.figure()
     ax = fig.gca()
 
-    visualize_2D_pdf(ax, vf, dt, timesteps, bounds=[-1, 1, -1, 1])
+    visualize_2D_pdf(ax, vf, dt, timesteps, bounds=fig_bounds)
 
     plt.show()
