@@ -51,9 +51,9 @@ def pdf(x : np.ndarray, vf : VelocityField, dt : float, timesteps : int):
     log_px = 0
     for _ in range(timesteps):
         log_px += vf.divergence(z_t) * dt
-        z_t += vf.velocity(z_t) * dt
+        z_t -= vf.velocity(z_t) * dt
     
-    log_px += standard_multivariate_gaussian_pdf(z_t)
+    log_px += np.log(standard_multivariate_gaussian_pdf(z_t))
     return np.exp(log_px)
     
 def visualize_2D_pdf(ax : plt.Axes, vf : VelocityField, dt : float, timesteps : int, bounds : list, resolution = 100):
@@ -63,5 +63,7 @@ def visualize_2D_pdf(ax : plt.Axes, vf : VelocityField, dt : float, timesteps : 
         for j in range(X0.shape[1]):
             Z[i, j] = pdf(np.array([X0[i, j], X1[i, j]]), vf, dt, timesteps)
     
-    ax.contourf(X0, X1, Z, levels=100, cmap='viridis')
+    #ax.contourf(X0, X1, Z, levels=100, cmap='viridis')
+    ax.plot_surface(X0, X1, Z, vmin=0, vmax=Z.max(), cmap='magma')
+    ax.set_title("Target Density")
     return ax

@@ -7,6 +7,7 @@ from itertools import product
 
 from velocity_field import VelocityField
 from pdf import visualize_2D_pdf
+import integrators
 
 def region_post_sampling(vf : VelocityField, dt : float, region : Rectangle, n_samples : int, epsilon : float):
     """
@@ -72,8 +73,11 @@ class RegionBoundaryDiscretization:
         left = np.linspace([region.mins[0], region.maxes[1]], region.mins, n, endpoint=False)
         self.boundary_points = np.vstack([bottom, right, top, left])
     
-    def flow(self, vf : VelocityField, dt : float, t : float = None):
+    def flow_forward(self, vf : VelocityField, dt : float, t : float = None):
         self.boundary_points += np.array([dt * vf.velocity(bi, t) for bi in self.boundary_points])
+
+    def flow_backward(self, vf : VelocityField, dt : float, t : float = None):
+        self.boundary_points -= np.array([dt * vf.velocity(bi, t) for bi in self.boundary_points])
 
 def show_2D_transformed_region(ax : plt.Axes, tf_region : RegionBoundaryDiscretization, color='blue', alpha=0.2):
     #ax.scatter(tf_region.boundary_points[0], tf_region.boundary_points[1])
@@ -95,16 +99,15 @@ if __name__ == "__main__":
 
     #u0 = -1/3 * x[1]**3 + .1 * x[1] * x[0]
     #u1 = 1/2 * x[0]**2 + x[1]**3 * x[0]
-    u0 = 2*sp.erf(x[1]) 
-    u1 = sp.atan(1/5 * x[0] * x[1])
+    u0 = 2*sp.erf(x[1])
+    u1 = sp.atan(1/5 * x[0] * x[1]) + 2 * x[0] 
 
     vf = VelocityField(x, [u0, u1])
 
-    dt = 0.1
+    dt = 0.3
 
-    initial_region = Rectangle([0.3, -0.3], [0.2, -0.4])
-    integral_result = vf.volume_time_derivative(initial_region)
-    print("Integral result: ", integral_result)
+    target_region = Rectangle(mins=[2, 2], maxes=[3, 3])
+    integral_result = vf.volume_time_derivative(target_region)
 
     fig = plt.figure()
     ax = fig.gca()
@@ -115,18 +118,24 @@ if __name__ == "__main__":
     vf.visualize(ax, fig_bounds)
 
     # Show the initial region
-    show_2D_region(ax, initial_region, color='red')
-    tf_region = RegionBoundaryDiscretization(initial_region, n=20)
+    show_2D_region(ax, target_region, color='red')
+    tf_region = RegionBoundaryDiscretization(target_region, n=20)
 
-    timesteps = 10
+    timesteps = 5
     for _ in range(timesteps):
-        tf_region.flow(vf, dt)
+        tf_region.flow_backward(vf, dt)
         show_2D_transformed_region(ax, tf_region=tf_region, color='red')
 
     # Show the PDF
-    fig = plt.figure()
-    ax = fig.gca()
+    fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
 
     visualize_2D_pdf(ax, vf, dt, timesteps, bounds=fig_bounds)
+
+    # Compute integrals
+
+    P_mc = integrators.mc_prob(target_region, vf, dt, timesteps, 500000)
+    print("Monte Carlo probability:    ", P_mc)
+    P_vegas = integrators.density_mc_integral(target_region, vf, dt, timesteps, 40000)
+    print("Vegas integral probability: ", P_vegas)
 
     plt.show()

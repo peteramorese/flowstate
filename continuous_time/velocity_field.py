@@ -81,7 +81,6 @@ class VelocityField:
         # Integral of divergence splits in to n integrals over each individual antiderivative
         integral = 0
         for antideriv in self.div_anti_derivatives_num:
-            print("  integral result = ", evaluate_integral(antideriv, region))
             integral += evaluate_integral(antideriv, region)
         return integral
 
@@ -92,8 +91,8 @@ class VelocityField:
         V1 = self.v[1](X0, X1)
 
         ax.quiver(X0, X1, V0, V1)
-        ax.set_xlabel("x_0")
-        ax.set_xlabel("x_1")
+        ax.set_xlabel("x0")
+        ax.set_ylabel("x1")
         ax.set_title("Velocity Field")
         ax.axis('equal')
         ax.grid(True)
