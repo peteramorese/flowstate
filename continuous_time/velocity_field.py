@@ -63,7 +63,7 @@ class VelocityField:
         assert (t == None) == (self.t_symbol == None)
         assert len(x) == self.dim
 
-        if i:
+        if i is not None:
             return self.v[i](*x, t) if self.t_symbol else self.v[i](*x)
         else:
             vel = np.zeros(x.shape)
