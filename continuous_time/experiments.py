@@ -7,7 +7,7 @@ from scipy.spatial import Rectangle
 from itertools import product
 
 from velocity_field import VelocityField
-from pdf import visualize_2D_pdf
+from pdf import visualize_2D_pdf, std_gaussian_integral_hyperrectangle
 from box_flow_algo import sample_box_flow_algo
 import integrators
 import visualizers as vis
@@ -58,30 +58,35 @@ if __name__ == "__main__":
 
     #u0 = -1/3 * x[1]**3 + .1 * x[1] * x[0]
     #u1 = 1/2 * x[0]**2 + x[1]**3 * x[0]
-    u0 = 2*sp.erf(x[1])
-    u1 = sp.atan(1/5 * x[0] * x[1]) + 2 * x[0] 
+
+    #u0 = 2*sp.erf(x[1])
+    #u1 = sp.atan(1/5 * x[0] * x[1]) + 2 * x[0] 
+
+    # Trivial field
+    u0 = x[1]
+    u1 = x[0]
 
     vf = VelocityField(x, [u0, u1])
-    dt = 0.001
-    timesteps = 100
+    dt = 0.2
+    timesteps = 3
 
     target_region = Rectangle(mins=[0, 0], maxes=[1, 1])
     integral_result = vf.volume_time_derivative(target_region)
 
     fig = plt.figure()
-    ax = fig.gca()
+    ax_vf = fig.gca()
 
     fig_bounds = 5*np.array([-1, 1, -1, 1])
 
     # Show the v field
-    vf.visualize(ax, fig_bounds)
+    vf.visualize(ax_vf, fig_bounds)
 
     # Show the initial region
-    vis.show_2D_region(ax, target_region, color='red')
+    vis.show_2D_region(ax_vf, target_region, color='red')
     tf_region = vis.RegionBoundaryDiscretization(target_region, n=20)
     for _ in range(timesteps):
         tf_region.flow_backward(vf, dt)
-        vis.show_2D_transformed_region(ax, tf_region=tf_region, color='red')
+        vis.show_2D_transformed_region(ax_vf, tf_region=tf_region, color='red')
 
     # Show the PDF
     fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
@@ -96,15 +101,23 @@ if __name__ == "__main__":
 
     # Box algorithm
     def box_propagator(region : Rectangle):
-        return region_post_sampling(vf, dt, region, 1000, direction=-1, epsilon=0.1)
+        return region_post_sampling(vf, dt, region, 1000, direction=-1, epsilon=0.01)
 
     # Show the box algo steps
-    #fig, axes = plt.subplots(nrows=1, ncols=timesteps)
-    #for ax in axes:
-    #    vf.visualize(ax, fig_bounds)
-    #P_box_algo = sample_box_flow_algo(target_region, 0.01, vf, dt, timesteps, box_propagator, axes)
+    fig, axes = plt.subplots(nrows=1, ncols=(timesteps + 1))
+    for ax in axes:
+        vf.visualize(ax, fig_bounds)
+    P_box_algo = sample_box_flow_algo(target_region, 0.00001, vf, dt, timesteps, box_propagator, axes)
 
-    P_box_algo = sample_box_flow_algo(target_region, 0.01, vf, dt, timesteps, box_propagator)
+    #P_box_algo = sample_box_flow_algo(target_region, 0.001, vf, dt, timesteps, box_propagator)
     print("Box algo probability:       ", P_box_algo)
+
+    t_maxes = [target_max - dt * timesteps for target_max in target_region.maxes]
+    t_mins = [target_min - dt * timesteps for target_min in target_region.mins]
+    trivial_region = Rectangle(t_maxes, t_mins)
+    vis.show_2D_region(ax_vf, trivial_region, color='green')
+    print("TRIVIAL REGION: ", trivial_region)
+    P_trivial = std_gaussian_integral_hyperrectangle(trivial_region)
+    print("True value (trivial field):       ", P_trivial)
 
     plt.show()
