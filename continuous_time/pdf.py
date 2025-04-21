@@ -4,6 +4,7 @@ from scipy.spatial import Rectangle
 from scipy.stats import multivariate_normal
 from scipy import special
 from typing import Tuple
+from itertools import product
 
 from velocity_field import VelocityField
 
@@ -41,16 +42,25 @@ def std_gaussian_integral_hyperrectangle(region : Rectangle) -> float:
     
     return total_prob
 
+def std_gaussian_pdf_min_val(region : Rectangle):
+    vertices = list(product(*zip(region.mins, region.maxes)))
+    min_density = np.inf
+    for vertex in vertices:
+        density = standard_multivariate_gaussian_pdf(np.array(vertex))
+        if density < min_density:
+            min_density = density
+    return min_density
+
 def pdf(x : np.ndarray, vf : VelocityField, dt : float, timesteps : int):
     """
-    Compute the probability density found by flowing mass from a std Gaussian
+    Compute the probability density found by flowing mass backwards to std gaussian
     through a given velocity field
     """
     # Set the initial z to x
     z_t = x
     log_px = 0
     for _ in range(timesteps):
-        log_px += vf.divergence(z_t) * dt
+        log_px -= vf.divergence(z_t) * dt
         z_t -= vf.velocity(z_t) * dt
     
     log_px += np.log(standard_multivariate_gaussian_pdf(z_t))

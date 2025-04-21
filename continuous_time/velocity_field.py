@@ -61,11 +61,11 @@ class VelocityField:
 
     def velocity(self, x : np.ndarray, t : float = None, i : int = None):
         assert (t == None) == (self.t_symbol == None)
-        assert len(x) == self.dim
 
         if i is not None:
             return self.v[i](*x, t) if self.t_symbol else self.v[i](*x)
         else:
+            assert len(x) == self.dim
             vel = np.zeros(x.shape)
             for i, vi in enumerate(self.v):
                 vel[i] = vi(*x, t) if self.t_symbol else vi(*x)
