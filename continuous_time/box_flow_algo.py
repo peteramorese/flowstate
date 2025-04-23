@@ -4,6 +4,7 @@ import copy
 from scipy.spatial import Rectangle
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+from itertools import product
 
 from velocity_field import VelocityField
 from pdf import std_gaussian_integral_hyperrectangle, standard_multivariate_gaussian_pdf, std_gaussian_pdf_min_val
@@ -213,7 +214,7 @@ def smart_box_flow_algo(target_region : Rectangle, vf : VelocityField, dt : floa
         return div_at_center - extremum
 
     if axes is not None:
-        true_region = vis.RegionBoundaryDiscretization(target_region)
+        true_region = vis.RegionBoundaryDiscretization(target_region, n=100)
     ax = None
 
     region_t = copy.deepcopy(target_region)
@@ -234,4 +235,35 @@ def smart_box_flow_algo(target_region : Rectangle, vf : VelocityField, dt : floa
 
             region_t = propagate_region(region_t)
         else:
-            return std_gaussian_integral_hyperrectangle(region_t) - true_region_vol_bound * std_gaussian_pdf_min_val(region_t)
+            #print("Integrating over region: ", region_t, " probability: ", std_gaussian_integral_hyperrectangle(region_t))
+            #print("true region vol bound: ", true_region_vol_bound, " region_t volume: ", region_t.volume())
+            return std_gaussian_integral_hyperrectangle(region_t) - (region_t.volume() - true_region_vol_bound) * std_gaussian_pdf_min_val(region_t)
+        
+def evaluate_on_grid(target_region : Rectangle, resolution : int, algorithm, axes=None):
+    if isinstance(resolution, int):
+        resolution = [resolution] * target_region.m
+    resolution = np.array(resolution)
+
+    # Create linspace excluding the rightmost edge
+    linspaces = [np.linspace(target_region.mins[i], target_region.maxes[i], resolution[i], endpoint=False) for i in range(target_region.m)]
+    grid = product(*linspaces)
+
+    cell_size = (target_region.maxes - target_region.mins) / resolution
+
+
+    indices = product(*[range(s) for s in resolution])
+
+    total_probability = 0
+
+    for idx in indices:
+        idx = np.array(idx)
+        cell_mins = target_region.mins + idx * cell_size
+        cell_maxes = cell_mins + cell_size
+        #print("cell mins: ",cell_mins ,"cell maxes: ", cell_maxes)
+        if axes is not None:
+            P_cell = algorithm(Rectangle(mins=cell_mins, maxes=cell_maxes), axes)
+        else:
+            P_cell = algorithm(Rectangle(mins=cell_mins, maxes=cell_maxes))
+        total_probability += P_cell
+
+    return total_probability

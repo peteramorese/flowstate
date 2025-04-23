@@ -8,7 +8,7 @@ from itertools import product
 
 from velocity_field import VelocityField
 from pdf import visualize_2D_pdf, std_gaussian_integral_hyperrectangle
-from box_flow_algo import naive_box_flow_algo, smart_box_flow_algo
+from box_flow_algo import naive_box_flow_algo, smart_box_flow_algo, evaluate_on_grid
 import integrators
 import visualizers as vis
 
@@ -18,8 +18,7 @@ if __name__ == "__main__":
     x = sp.symbols('x:2')
     t = sp.symbols('t')
 
-    #u0 = 2*sp.erf(x[1])
-    #u1 = sp.atan(1/5 * x[0] * x[1]) + 2 * x[0] 
+    # Nonlinear field
 
     # Constants
     a00, a10, a11 = 0.5, -1, 2
@@ -36,13 +35,15 @@ if __name__ == "__main__":
         0 + 0.1 * a11               # L(div(v) wrt x1) = L(dv0dx0 wrt x1) + L(dv1dx1 wrt x1)
     ]))
 
-    # Trivial field
+    ## Trivial field
     #u0 = x[1]
     #u1 = x[0]
+    #jacobian_bound = np.array([[0, 0], [0, 0]])
+    #divergence_lipschitz_bounds = np.array([0, 0])
 
     vf = VelocityField(x, [u0, u1])
     dt = 0.1
-    timesteps = 20
+    timesteps = 10
 
     target_region = Rectangle(mins=[1, 1], maxes=[2, 2])
     #target_region = Rectangle(mins=[-100, -100], maxes=[100, 100])
@@ -72,9 +73,9 @@ if __name__ == "__main__":
 
     # Compute integrals
     P_mc = integrators.mc_prob(target_region, vf, dt, timesteps, 100000)
-    print("Monte Carlo probability:    ", P_mc)
+    print("Monte Carlo probability:            ", P_mc)
     P_vegas = integrators.density_mc_integral(target_region, vf, dt, timesteps, 5000)
-    print("Vegas integral probability: ", P_vegas)
+    print("Vegas integral probability:         ", P_vegas)
 
     # Naive box algorithm
     #fig, axes = plt.subplots(nrows=1, ncols=(timesteps + 1))
@@ -82,7 +83,7 @@ if __name__ == "__main__":
     #    vf.visualize(ax, fig_bounds)
     axes = None
     P_box_algo_naive = naive_box_flow_algo(target_region, vf, dt, timesteps, jacobian_bound, axes=axes)
-    print("Naive box algo probability: ", P_box_algo_naive)
+    print("Naive box algo probability:         ", P_box_algo_naive)
 
     # Smart box algorithm
     #fig, axes = plt.subplots(nrows=1, ncols=(timesteps + 1))
@@ -90,7 +91,22 @@ if __name__ == "__main__":
     #    vf.visualize(ax, fig_bounds)
     axes = None
     P_box_algo_smart = smart_box_flow_algo(target_region, vf, dt, timesteps, jacobian_bound, divergence_lipschitz_bounds, axes=axes)
-    print("Smart box algo probability:", P_box_algo_smart)
+    print("Smart box algo probability:         ", P_box_algo_smart)
+
+    #fig, axes = plt.subplots(nrows=1, ncols=(timesteps + 1))
+    #for ax in axes:
+    #    vf.visualize(ax, fig_bounds)
+    #algo = lambda region_cell, axs : smart_box_flow_algo(region_cell, vf, dt, timesteps, jacobian_bound, divergence_lipschitz_bounds, axes=axs)
+    #P_box_algo_smart_grid = evaluate_on_grid(target_region, resolution=30, algorithm=algo, axes=axes)
+    #print("Smart box algo (grid) probability:  ", P_box_algo_smart_grid)
+
+    #evolved_trivial_region = Rectangle(mins=(target_region.mins - dt * timesteps), maxes=(target_region.maxes - dt * timesteps))
+    #print("\nevolved trivial region: ",evolved_trivial_region)
+    #vis.show_2D_region(ax_vf, evolved_trivial_region)
+    #trivial_field_prob = std_gaussian_integral_hyperrectangle(evolved_trivial_region)
+    #print("trivial field prob: ", trivial_field_prob)
+
+
 
 
     plt.show()
