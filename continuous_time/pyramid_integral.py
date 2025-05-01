@@ -65,7 +65,8 @@ def adversarial_integral(region : Rectangle, facet_slope : float, apex_value : f
     """
     Calculate the adversarial integral of a chopped hyperpyramid (prism) with equal facet slope in each dimension.
     """
-    assert target_region_volume <= region.volume()
+    total_volume = region.volume()
+    assert target_region_volume <= total_volume 
 
     center_point = (region.mins + region.maxes) / 2
     origin_centered_region = copy.deepcopy(region)
@@ -115,23 +116,24 @@ def adversarial_integral(region : Rectangle, facet_slope : float, apex_value : f
             #print("iteration vol upper bound: ", iteration_volume_upper_bound)
             #iteration_upper_bound = previous_volume + (volume_polynomial(-sorted_region_lengths[i + 1] / 2) - volume_polynomial(-sorted_region_lengths[i] / 2))
         else:
-            iteration_volume_upper_bound = region.volume()
+            iteration_volume_upper_bound = total_volume
         
-        print("i: ", i, " iteration vol ub: ", iteration_volume_upper_bound, " VOLUME POLY: ", volume_polynomial) 
+        print("i: ", i, " iteration vol ub: ", iteration_volume_upper_bound, " prev volume: ", previous_volume, " VOLUME POLY: ", volume_polynomial) 
         if target_region_volume > iteration_volume_upper_bound:
-            previous_volume += iteration_volume_upper_bound
+            previous_volume = iteration_volume_upper_bound
             mass_coefficient = np.prod(sorted_region_lengths[i+1:])
             #print("mass_coeff: ", mass_coefficient, " sorted region lengths: ", sorted_region_lengths[i+1:])
             #print("volume u c: ", (volume_polynomial(-sorted_region_lengths[i + 1] / 2) - volume_polynomial(-sorted_region_lengths[i] / 2)))
             previous_mass += mass_coefficient * (volume_polynomial(-sorted_region_lengths[i + 1] / 2) - volume_polynomial(-sorted_region_lengths[i] / 2))
             continue
         else:
-            constant = previous_volume + sorted_region_lengths[i]**(i+1) * np.prod(sorted_region_lengths[i+1:])
-            coefficient = np.prod(sorted_region_lengths[i+2:])
-            l = 0.5*(sorted_region_lengths[i] - ((constant - target_region_volume) / coefficient)**(1/(i+1)))
+            #print("previous volume: " , previous_volume, " + ", sorted_region_lengths[i]**(i+1), " * ", np.prod(sorted_region_lengths[i+1:]))
+            #constant = previous_volume + sorted_region_lengths[i]**(i+1) * np.prod(sorted_region_lengths[i+1:])
+            coefficient = np.prod(sorted_region_lengths[i+1:])
+            l = 0.5*(sorted_region_lengths[i] - ((total_volume - target_region_volume) / coefficient)**(1/(i+1)))
             
             mass_coefficient = np.prod(sorted_region_lengths[i+1:])
-            print("constant: ", constant, " coefficient: ", coefficient, " l: ", l, " w/2: ", sorted_region_lengths[i]/2, " mass_coeff: ", mass_coefficient)
+            print("coefficient: ", coefficient, " l: ", l, " w/2: ", sorted_region_lengths[i]/2, " mass_coeff: ", mass_coefficient)
             print("first val: ", l - sorted_region_lengths[i] / 2, " second val: ", -sorted_region_lengths[i] / 2)
             return previous_mass + mass_coefficient * (volume_polynomial(l - sorted_region_lengths[i] / 2) - volume_polynomial(-sorted_region_lengths[i] / 2))
 
@@ -146,27 +148,39 @@ def adversarial_integral(region : Rectangle, facet_slope : float, apex_value : f
 
 
 if __name__ == "__main__":
-    #region = Rectangle(mins=[0, 0, 0], maxes=[1.2, 2, 0.5])
-    region = Rectangle(mins=[0, 0], maxes=[2, 1])
+    #region = Rectangle(mins=[0, 0], maxes=[2, 1])
+    #region = Rectangle(mins=[-0.6, -1, -0.25], maxes=[0.6, 1, 0.25])
+    region = Rectangle(mins=[0.3, -1, -0.25, 5], maxes=[0.9, 2, 0.28, 7])
     print("original region: ", region)
+
     L = 1
     c = region.mins + (region.maxes - region.mins) / 2
     f_of_c = 0.5
 
-    test_l = 0.5
-    target_vol = 1 + 1 - (1 - 2 * test_l)**2
-    print("target_vol:", target_vol)
+    ## iteration 3
+    #test_l = 0.1
+    #target_vol = 1.2 - (0.5 - 2 * test_l)**3
+    #inner_region = Rectangle(mins=[-0.25 + test_l, -0.25 + test_l, -0.25 + test_l], maxes = [0.25 - test_l, 0.25 - test_l, 0.25 - test_l])
+
+    ## iteration 2
+    #test_l = .6 - .25
+    #target_vol = 1.2 - 0.5*(1.2 - 2 * test_l)**2
+    #inner_region = Rectangle(mins=[-0.6 + test_l, -0.6 + test_l, -0.25], maxes = [0.6 - test_l, 0.6 - test_l, 0.25])
+
+    target_vol = region.volume()
+    #print("target_vol:", target_vol, "inner region vol: ", inner_region.volume())
     mass = adversarial_integral(region, L, f_of_c, target_vol)
     print("target vol:", target_vol, " adversarial mass: ", mass)
 
     def f(x):
         return f_of_c - np.linalg.norm(x - c, ord=np.inf)
 
-    inner_region = Rectangle(mins=[0.5 + test_l, test_l], maxes = [2 - 0.5 - test_l, 1 - test_l])
-    true_val = integral_comparison(f, region, n_samples=100000) - integral_comparison(f, inner_region, n_samples=100000)
+    #print("inner region: ", inner_region)
+    #true_val = integral_comparison(f, region, n_samples=300000) - integral_comparison(f, inner_region, n_samples=300000)
+    true_val = integral_comparison(f, region, n_samples=300000) 
     print("Total region integral: ", true_val)
 
-    plot_function_2d(f, region, 100)
+    #plot_function_2d(f, region, 100)
     
     ## Integral (numerical)
     #def numerical_area(l):
