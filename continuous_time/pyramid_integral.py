@@ -5,6 +5,90 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import copy
 
+def volume_hyperpyramid(base : Rectangle, height : float):
+    return base.volume() * height / (base.m + 1)
+
+def scale_nd_rectangle(region : Rectangle, scales : np.ndarray):
+    """
+    Scales a region by given scale factors.
+    """
+
+    center = (region.mins + region.maxes) / 2
+    half_sizes = (region.maxes - region.mins) / 2
+
+    new_half_sizes = half_sizes * scales
+
+    scaled_region = Rectangle(mins=center - new_half_sizes, maxes=center + new_half_sizes)
+
+    volume_change = region.volume() / scaled_region.volume()
+
+    return scaled_region, volume_change
+
+def adversarial_integral(region : Rectangle, facet_slope : float, apex_value : float, target_region_volume : float):
+    """
+    Calculate the adversarial integral of a chopped hyperpyramid (prism) with equal facet slope in each dimension.
+    """
+    total_volume = region.volume()
+    assert target_region_volume <= total_volume 
+
+    # Center the region about the origin
+    center_point = (region.mins + region.maxes) / 2
+    origin_centered_region = copy.deepcopy(region)
+    origin_centered_region.mins -= center_point
+    origin_centered_region.maxes -= center_point
+
+    # Re-orient the rectangle such that the lengths decrease as dimensions increase
+    sorted_dims = sorted(range(region.m), key=lambda i: origin_centered_region.mins[i])
+    sorted_centered_region = Rectangle(mins=origin_centered_region.mins[sorted_dims], maxes=origin_centered_region.maxes[sorted_dims])
+
+    def create_mass_polynomial(base_dim, apex_value):
+        # Construct the volume polynomial
+        
+        # Coefficient counts the number of edge pieces are added equal to number of facets on n-rectangle
+        p = Polynomial([2 * base_dim])
+
+        # Multiply the integral regions (dA)
+        p *= Polynomial([0, -2])**(base_dim - 1)
+        
+        # Multiply by the linear function integrand
+        p *= Polynomial([apex_value, facet_slope])
+    
+        # Integrate the polynomial to get the volume polynomial
+        return p.integ()
+    
+    sorted_region_lengths = sorted_centered_region.maxes - sorted_centered_region.mins
+    np.append(sorted_region_lengths, 1) # Append 1 for cleaner code
+    previous_volume = 0 # Track the volume of the previous iterations
+    previous_mass = 0 # Track the cumulative integral value
+    for i in range(sorted_centered_region.m):
+
+        volume_polynomial = create_mass_polynomial(i + 1, apex_value)
+        
+        # Check if the target_region volume is beyond this iteration by just checking the endpoint
+        if i < (sorted_centered_region.m - 1):
+            iteration_volume_upper_bound = previous_volume + (sorted_region_lengths[i]**(i+1) * np.prod(sorted_region_lengths[i+1:]) - sorted_region_lengths[i+1]**(i+2) * np.prod(sorted_region_lengths[i+2:]))
+        else:
+            iteration_volume_upper_bound = total_volume
+        
+        # If the target region volume exceeds the iteration upper bound, simply move to the next iteration 
+        # otherwise, then we need to solve for indeterminate dimension defining the interior region
+        if target_region_volume > iteration_volume_upper_bound:
+            previous_volume = iteration_volume_upper_bound
+
+            # Add the integral over the volume for this iteration
+            mass_coefficient = np.prod(sorted_region_lengths[i+1:])
+            previous_mass += mass_coefficient * (volume_polynomial(-sorted_region_lengths[i + 1] / 2) - volume_polynomial(-sorted_region_lengths[i] / 2))
+            continue
+        else:
+            # Solve for the indeterminate dimension
+            coefficient = np.prod(sorted_region_lengths[i+1:])
+            l = 0.5*(sorted_region_lengths[i] - ((total_volume - target_region_volume) / coefficient)**(1/(i+1)))
+            
+            # Calculate the integral without including the interior region (and future iterations)
+            mass_coefficient = np.prod(sorted_region_lengths[i+1:])
+            return previous_mass + mass_coefficient * (volume_polynomial(l - sorted_region_lengths[i] / 2) - volume_polynomial(-sorted_region_lengths[i] / 2))
+
+
 def integral_comparison(f, region : Rectangle, n_samples : int = 10000):
     # Dimension
     n = region.m
@@ -57,86 +141,6 @@ def plot_function_2d(f, region : Rectangle, resolution=100):
     ax.set_title('3D Plot of f(x, y)')
     ax.set_aspect('equal')
     plt.tight_layout()
-
-def volume_hyperpyramid(base : Rectangle, height : float):
-    return base.volume() * height / (base.m + 1)
-
-def adversarial_integral(region : Rectangle, facet_slope : float, apex_value : float, target_region_volume : float):
-    """
-    Calculate the adversarial integral of a chopped hyperpyramid (prism) with equal facet slope in each dimension.
-    """
-    total_volume = region.volume()
-    assert target_region_volume <= total_volume 
-
-    center_point = (region.mins + region.maxes) / 2
-    origin_centered_region = copy.deepcopy(region)
-    origin_centered_region.mins -= center_point
-    origin_centered_region.maxes -= center_point
-
-    if apex_value - facet_slope * max(origin_centered_region.maxes) < 0 and apex_value > 0:
-        # The volume changes sign somewhere
-        l_positive = apex_value / facet_slope
-    else:
-        l_positive = np.inf
-
-    sorted_dims = sorted(range(region.m), key=lambda i: origin_centered_region.mins[i])
-    sorted_centered_region = Rectangle(mins=origin_centered_region.mins[sorted_dims], maxes=origin_centered_region.maxes[sorted_dims])
-    print("sorted_centered_region: ", sorted_centered_region)
-
-    def create_mass_polynomial(base_dim, base_length, apex_value):
-        # Construct the polynomial f(x)(w - 2 * x)^d where d is the dimension of the base
-        # x is the distance inward on either side of the symmetric pyramid, and f(x) is the linear integrand
-        
-        # Coefficient counts the number of edge pieces are added equal to number of facets on n-rectangle
-        p = Polynomial([2 * base_dim])
-
-        # Multiply the integral regions (dA)
-        p *= Polynomial([0, -2])**(base_dim - 1)
-        
-        # Multiply by the linear function integrand: y = m(x - w) + a where a is the apex value and m is the slope
-        p *= Polynomial([apex_value, facet_slope])
-    
-        # Integrate the polynomial to get the volume polynomial
-        #print("p before integ: ", p)
-        return p.integ()
-    
-    sorted_region_lengths = sorted_centered_region.maxes - sorted_centered_region.mins
-    np.append(sorted_region_lengths, 1)
-    previous_volume = 0
-    previous_mass = 0
-    for i in range(sorted_centered_region.m):
-        # Symmetric pyramid dimension
-
-        volume_polynomial = create_mass_polynomial(i + 1, sorted_region_lengths[i], apex_value)
-        
-        # Check if the target_region volume is beyond this iteration by just checking the endpoint
-        if i < (sorted_centered_region.m - 1):
-            #iteration_volume_upper_bound = previous_volume + (sorted_region_lengths[i+1] - sorted_region_lengths[i])**(i+1) * np.prod(sorted_region_lengths[i+1:])
-            iteration_volume_upper_bound = previous_volume + (sorted_region_lengths[i]**(i+1) * np.prod(sorted_region_lengths[i+1:]) - sorted_region_lengths[i+1]**(i+2) * np.prod(sorted_region_lengths[i+2:]))
-            #print("iteration vol upper bound: ", iteration_volume_upper_bound)
-            #iteration_upper_bound = previous_volume + (volume_polynomial(-sorted_region_lengths[i + 1] / 2) - volume_polynomial(-sorted_region_lengths[i] / 2))
-        else:
-            iteration_volume_upper_bound = total_volume
-        
-        print("i: ", i, " iteration vol ub: ", iteration_volume_upper_bound, " prev volume: ", previous_volume, " VOLUME POLY: ", volume_polynomial) 
-        if target_region_volume > iteration_volume_upper_bound:
-            previous_volume = iteration_volume_upper_bound
-            mass_coefficient = np.prod(sorted_region_lengths[i+1:])
-            #print("mass_coeff: ", mass_coefficient, " sorted region lengths: ", sorted_region_lengths[i+1:])
-            #print("volume u c: ", (volume_polynomial(-sorted_region_lengths[i + 1] / 2) - volume_polynomial(-sorted_region_lengths[i] / 2)))
-            previous_mass += mass_coefficient * (volume_polynomial(-sorted_region_lengths[i + 1] / 2) - volume_polynomial(-sorted_region_lengths[i] / 2))
-            continue
-        else:
-            #print("previous volume: " , previous_volume, " + ", sorted_region_lengths[i]**(i+1), " * ", np.prod(sorted_region_lengths[i+1:]))
-            #constant = previous_volume + sorted_region_lengths[i]**(i+1) * np.prod(sorted_region_lengths[i+1:])
-            coefficient = np.prod(sorted_region_lengths[i+1:])
-            l = 0.5*(sorted_region_lengths[i] - ((total_volume - target_region_volume) / coefficient)**(1/(i+1)))
-            
-            mass_coefficient = np.prod(sorted_region_lengths[i+1:])
-            print("coefficient: ", coefficient, " l: ", l, " w/2: ", sorted_region_lengths[i]/2, " mass_coeff: ", mass_coefficient)
-            print("first val: ", l - sorted_region_lengths[i] / 2, " second val: ", -sorted_region_lengths[i] / 2)
-            return previous_mass + mass_coefficient * (volume_polynomial(l - sorted_region_lengths[i] / 2) - volume_polynomial(-sorted_region_lengths[i] / 2))
-
 
         
     

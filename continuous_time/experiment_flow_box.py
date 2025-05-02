@@ -7,7 +7,7 @@ from scipy.spatial import Rectangle
 from itertools import product
 
 from velocity_field import VelocityField
-from pdf import visualize_2D_pdf, std_gaussian_integral_hyperrectangle
+from pdf import visualize_2D_pdf, std_gaussian_integral_hyperrectangle, std_gaussian_cdf
 from box_flow_algo import naive_box_flow_algo, smart_box_flow_algo, evaluate_on_grid, min_div_integ_bound, adversarial_div_integ_bound
 import integrators
 import visualizers as vis
@@ -23,16 +23,34 @@ if __name__ == "__main__":
     # Constants
     a00, a10, a11 = 0.5, -1, 2
 
+    # v0 = du0/dx1 = a00 / (1 + exp(-x[0])) - cos(x[1])
     u0 = a00 * x[1] / (1 + sp.exp(-x[0])) + sp.sin(x[1])
+    # v1 = du1/dx0 = a10 * exp(x[0]) / (exp(x[0]) + 1) + a11 / (1 + exp(-x[1]))
     u1 = a10 * sp.log(sp.exp(x[0]) + 1) + a11 * x[0] / (1 + sp.exp(-x[1])) 
 
-    jacobian_bound = np.abs(np.array([
+    # Lipschitz constants for velocity
+    velocity_jacobian_bound = np.abs(np.array([
         [1/4 * a00, 1],             # L(v0 wrt x0), L(v0 wrt x1)
         [1/4 * a10, 1/4 * a11]      # L(v1 wrt x0), L(v1 wrt x1)
     ]))
     divergence_lipschitz_bounds = np.abs(np.array([
         0.1 * a00 + 0,              # L(div(v) wrt x0) = L(dv0dx0 wrt x0) + L(dv1dx1 wrt x0)
         0 + 0.1 * a11               # L(div(v) wrt x1) = L(dv0dx0 wrt x1) + L(dv1dx1 wrt x1)
+    ]))
+    velocity_magnitude_bounds = np.abs(np.array([
+        np.abs(a00) + 1,            # >= |v0|
+        np.abs(a10) + np.abs(a11)   # >= |v1|
+    ]))
+
+    # Create the box field using the boundary condition envelopes
+    box_u0 = (x[0] - x[0]**2) * u0
+    box_u1 = (x[1] - x[1]**2) * u1
+
+    # Create the box field velocity jacobian bound
+    box_velocity_jacobian_bound = velocity_jacobian_bound + 4 * np.diag(velocity_magnitude_bounds)
+    box_divergence_lipschitz_bounds = np.abs(np.array([
+        (2 * velocity_magnitude_bounds[0] + 8 * velocity_jacobian_bound[0, 0] + 0.1 * a00) + (4 * velocity_jacobian_bound[1, 0] + 0),
+        (2 * velocity_magnitude_bounds[1] + 8 * velocity_jacobian_bound[1, 1] + 0.1 * a11) + (4 * velocity_jacobian_bound[0, 1] + 0),
     ]))
 
     ## Trivial field
@@ -41,17 +59,23 @@ if __name__ == "__main__":
     #jacobian_bound = np.array([[0, 0], [0, 0]])
     #divergence_lipschitz_bounds = np.array([0, 0])
 
-    vf = VelocityField(x, [u0, u1])
+    vf = VelocityField(x, [box_u0, box_u1])
     dt = 0.05
     timesteps = 30
 
     target_region = Rectangle(mins=[1, 1], maxes=[2, 2])
-    #target_region = Rectangle(mins=[-100, -100], maxes=[100, 100])
+
+    def convert_region_to_erf_space(region : Rectangle):
+        new_mins = [std_gaussian_cdf(m) for m in region.mins]
+        new_maxes = [std_gaussian_cdf(m) for m in region.maxes]
+        return Rectangle(mins=new_mins, maxes = new_maxes)
+
+    target_region = convert_region_to_erf_space(target_region)
 
     fig = plt.figure()
     ax_vf = fig.gca()
 
-    fig_bounds = 5*np.array([-1, 1, -1, 1])
+    fig_bounds = np.array([0, 1, 0, 1])
 
     # Show the v field
     vf.visualize(ax_vf, fig_bounds)
@@ -82,7 +106,7 @@ if __name__ == "__main__":
     #for ax in axes:
     #    vf.visualize(ax, fig_bounds)
     axes = None
-    P_box_algo_naive = naive_box_flow_algo(target_region, vf, dt, timesteps, jacobian_bound, axes=axes)
+    P_box_algo_naive = naive_box_flow_algo(target_region, vf, dt, timesteps, box_velocity_jacobian_bound, axes=axes)
     print("Naive box algo probability:         ", P_box_algo_naive)
 
     # Smart box algorithm
@@ -90,10 +114,10 @@ if __name__ == "__main__":
     #for ax in axes:
     #    vf.visualize(ax, fig_bounds)
     axes = None
-    P_box_algo_smart_md = smart_box_flow_algo(target_region, vf, dt, timesteps, jacobian_bound, divergence_lipschitz_bounds, divergence_integrator=min_div_integ_bound, axes=axes)
+    P_box_algo_smart_md = smart_box_flow_algo(target_region, vf, dt, timesteps, box_velocity_jacobian_bound, box_divergence_lipschitz_bounds, divergence_integrator=min_div_integ_bound, erf_space=True, axes=axes)
     print("Smart box algo probability (min div):         ", P_box_algo_smart_md)
 
-    P_box_algo_smart_ad = smart_box_flow_algo(target_region, vf, dt, timesteps, jacobian_bound, divergence_lipschitz_bounds, divergence_integrator=adversarial_div_integ_bound, axes=axes)
+    P_box_algo_smart_ad = smart_box_flow_algo(target_region, vf, dt, timesteps, box_velocity_jacobian_bound, box_divergence_lipschitz_bounds, divergence_integrator=adversarial_div_integ_bound, erf_space=True, axes=axes)
     print("Smart box algo probability (adv div):         ", P_box_algo_smart_ad)
 
     #fig, axes = plt.subplots(nrows=1, ncols=(timesteps + 1))

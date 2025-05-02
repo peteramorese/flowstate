@@ -14,6 +14,15 @@ def standard_multivariate_gaussian_pdf(x : np.ndarray):
     exponent = -0.5 * np.dot(x, x)
     return norm_const * np.exp(exponent)
 
+def std_gaussian_cdf(x : np.ndarray) -> float:
+    """
+    Compute the cumulative distribution function (CDF) of the standard multivariate Gaussian
+    at point x
+    """
+    return 0.5 * (1 + special.erf(x / np.sqrt(2)))
+    
+
+
 def std_gaussian_integral_hyperrectangle(region : Rectangle) -> float:
     """
     Compute the integral of the standard multivariate Gaussian distribution

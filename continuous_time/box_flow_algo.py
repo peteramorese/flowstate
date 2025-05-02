@@ -8,6 +8,7 @@ from itertools import product
 
 from velocity_field import VelocityField
 from pdf import std_gaussian_integral_hyperrectangle, standard_multivariate_gaussian_pdf, std_gaussian_pdf_min_val
+from pyramid_integral import adversarial_integral, scale_nd_rectangle
 import visualizers as vis
 
 def sample_box_flow_algo(target_region : Rectangle, sample_volume : float, vf : VelocityField, dt : float, timesteps : int, box_propagator, axes : list[plt.Axes] = None):
@@ -101,7 +102,7 @@ def sample_box_flow_algo(target_region : Rectangle, sample_volume : float, vf : 
 
             return probability
 
-def naive_box_flow_algo(target_region : Rectangle, vf : VelocityField, dt : float, timesteps : int, jacobian_bound : np.ndarray, axes : list[plt.Axes] = None):
+def naive_box_flow_algo(target_region : Rectangle, vf : VelocityField, dt : float, timesteps : int, jacobian_bound : np.ndarray, erf_space = False, axes : list[plt.Axes] = None):
     region_t = copy.deepcopy(target_region)
 
     def propagate_region(current_region : Rectangle):
@@ -160,7 +161,33 @@ def naive_box_flow_algo(target_region : Rectangle, vf : VelocityField, dt : floa
         else:
             return std_gaussian_integral_hyperrectangle(region_t)
 
-def smart_box_flow_algo(target_region : Rectangle, vf : VelocityField, dt : float, timesteps : int, jacobian_bound : np.ndarray, divergence_lipschitz_bounds : np.ndarray, axes : list[plt.Axes] = None):
+def min_div_integ_bound(region : Rectangle, volume_of_encl_region : float, divergence_at_center : float, divergence_lipschitz_bounds : np.ndarray):
+    """
+    Calculate a lower bound on the volume rate of change for the negative space around an enclosed region given an evaluation of the divergence at the center of the region
+    """
+    half_diag = 0.5 * (region.maxes - region.mins)
+    extremum = -np.inf # Absolute value of the lipschitz envelope at the boundaries of the region
+    for l, u, lipschitz_bound in zip(region.mins, region.maxes, divergence_lipschitz_bounds):
+        extremum_l = (u - l) * lipschitz_bound
+        if extremum_l > extremum:
+            extremum = extremum_l
+
+    volume_of_negative_space = region.volume() - volume_of_encl_region
+    min_divergence = divergence_at_center - extremum
+    return volume_of_negative_space * min_divergence
+
+def adversarial_div_integ_bound(region : Rectangle, volume_of_encl_region : float, divergence_at_center : float, divergence_lipschitz_bounds : np.ndarray):
+    """
+    Calculate the adversarial "worst case" integral of the divergence over the negative space around an enclosed region
+    """
+    # Scale the region such that each pyramidal facet has slope 1
+    scaled_region, volume_change = scale_nd_rectangle(region, divergence_lipschitz_bounds)
+
+    volume_of_negative_space = (region.volume() - volume_of_encl_region) / volume_change
+    integral = adversarial_integral(scaled_region, 1, divergence_at_center, volume_of_negative_space)
+    return integral * volume_change
+
+def smart_box_flow_algo(target_region : Rectangle, vf : VelocityField, dt : float, timesteps : int, jacobian_bound : np.ndarray, divergence_lipschitz_bounds : np.ndarray, divergence_integrator = min_div_integ_bound, erf_space = False, axes : list[plt.Axes] = None):
     def propagate_region(current_region : Rectangle):
         new_region_mins = current_region.mins.copy()
         new_region_maxes = current_region.maxes.copy()
@@ -200,19 +227,6 @@ def smart_box_flow_algo(target_region : Rectangle, vf : VelocityField, dt : floa
         #print("output region: ", new_region_mins, ", ", new_region_maxes)
         return Rectangle(maxes=new_region_maxes, mins=new_region_mins)
 
-    def get_min_divergence(region : Rectangle):
-        half_diag = 0.5 * (region.maxes - region.mins)
-        center_point = half_diag + region.mins
-        div_at_center = vf.divergence(center_point)
-
-        extremum = -np.inf # Absolute value of the lipschitz magnitude
-        for i in range(vf.dim):
-            extremum_i = half_diag[i] * divergence_lipschitz_bounds[i]
-            if extremum_i > extremum:
-                extremum = extremum_i
-        
-        return div_at_center - extremum
-
     if axes is not None:
         true_region = vis.RegionBoundaryDiscretization(target_region, n=100)
     ax = None
@@ -230,14 +244,19 @@ def smart_box_flow_algo(target_region : Rectangle, vf : VelocityField, dt : floa
             true_region.flow_backward(vf, dt)
 
         if k > 0:
-            min_div = get_min_divergence(region_t)
-            true_region_vol_bound += dt * (vf.volume_time_derivative(region_t) - min_div * (region_t.volume() - true_region_vol_bound))
+            center_point = 0.5 * (region_t.maxes - region_t.mins)
+            negative_space_div = divergence_integrator(region_t, true_region_vol_bound, vf.divergence(center_point), divergence_lipschitz_bounds)
+            print(" - negative space div (md): ", min_div_integ_bound(region_t, true_region_vol_bound, vf.divergence(center_point), divergence_lipschitz_bounds), " (ad): ", adversarial_div_integ_bound(region_t, true_region_vol_bound, vf.divergence(center_point), divergence_lipschitz_bounds))
+            true_region_vol_bound += dt * (vf.volume_time_derivative(region_t) - negative_space_div)
 
             region_t = propagate_region(region_t)
         else:
             #print("Integrating over region: ", region_t, " probability: ", std_gaussian_integral_hyperrectangle(region_t))
             #print("true region vol bound: ", true_region_vol_bound, " region_t volume: ", region_t.volume())
-            return std_gaussian_integral_hyperrectangle(region_t) - (region_t.volume() - true_region_vol_bound) * std_gaussian_pdf_min_val(region_t)
+            if not erf_space:
+                return std_gaussian_integral_hyperrectangle(region_t) - (region_t.volume() - true_region_vol_bound) * std_gaussian_pdf_min_val(region_t)
+            else:
+                return true_region_vol_bound
         
 def evaluate_on_grid(target_region : Rectangle, resolution : int, algorithm, axes=None):
     if isinstance(resolution, int):
