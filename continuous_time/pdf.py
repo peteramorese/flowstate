@@ -60,7 +60,7 @@ def std_gaussian_pdf_min_val(region : Rectangle):
             min_density = density
     return min_density
 
-def pdf(x : np.ndarray, vf : VelocityField, dt : float, timesteps : int):
+def pdf(x : np.ndarray, vf : VelocityField, dt : float, timesteps : int, erf_space = False):
     """
     Compute the probability density found by flowing mass backwards to std gaussian
     through a given velocity field
@@ -71,16 +71,19 @@ def pdf(x : np.ndarray, vf : VelocityField, dt : float, timesteps : int):
     for _ in range(timesteps):
         log_px -= vf.divergence(z_t) * dt
         z_t -= vf.velocity(z_t) * dt
+        if erf_space:
+            z_t = np.clip(z_t, 0, 1)
     
-    log_px += np.log(standard_multivariate_gaussian_pdf(z_t))
+    if not erf_space:
+        log_px += np.log(standard_multivariate_gaussian_pdf(z_t))
     return np.exp(log_px)
     
-def visualize_2D_pdf(ax : plt.Axes, vf : VelocityField, dt : float, timesteps : int, bounds : list, resolution = 100):
+def visualize_2D_pdf(ax : plt.Axes, vf : VelocityField, dt : float, timesteps : int, bounds : list, resolution = 100, erf_space = False):
     X0, X1 = np.meshgrid(np.linspace(bounds[0], bounds[1], resolution), np.linspace(bounds[2], bounds[3], resolution))
     Z = np.zeros_like(X0)
     for i in range(X0.shape[0]):
         for j in range(X0.shape[1]):
-            Z[i, j] = pdf(np.array([X0[i, j], X1[i, j]]), vf, dt, timesteps)
+            Z[i, j] = pdf(np.array([X0[i, j], X1[i, j]]), vf, dt, timesteps, erf_space=erf_space)
     
     #ax.contourf(X0, X1, Z, levels=100, cmap='viridis')
     ax.plot_surface(X0, X1, Z, vmin=0, vmax=Z.max(), cmap='magma')

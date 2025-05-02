@@ -133,15 +133,14 @@ def naive_box_flow_algo(target_region : Rectangle, vf : VelocityField, dt : floa
                     extremum = extremum_j
                 
             # Add the extremum to move the bounds of the new rectangle
-
             new_region_maxes[i] += (vi_center_u + extremum) * dt
             new_region_mins[i] += (vi_center_l - extremum) * dt
-            #print("extremum: ", extremum)
-            #print("vi_center_u: ", vi_center_u, " center_l: ", vi_center_l)
-            #print(" dim ", i, " new bounds: ", new_region_mins[i], " ", new_region_maxes[i])
-            #input("...")
-        
-        #print("output region: ", new_region_mins, ", ", new_region_maxes)
+
+            # Constrain the region to within the erf box
+            if erf_space:
+                new_region_maxes[i] = min(new_region_maxes[i], 1)
+                new_region_mins[i] = max(new_region_mins[i], 0)
+
         return Rectangle(maxes=new_region_maxes, mins=new_region_mins)
     
     if axes is not None:
@@ -159,7 +158,10 @@ def naive_box_flow_algo(target_region : Rectangle, vf : VelocityField, dt : floa
         if k > 0:
             region_t = propagate_region(region_t)
         else:
-            return std_gaussian_integral_hyperrectangle(region_t)
+            if not erf_space:
+                return std_gaussian_integral_hyperrectangle(region_t)
+            else:
+                return region_t.volume()
 
 def min_div_integ_bound(region : Rectangle, volume_of_encl_region : float, divergence_at_center : float, divergence_lipschitz_bounds : np.ndarray):
     """
@@ -178,13 +180,13 @@ def min_div_integ_bound(region : Rectangle, volume_of_encl_region : float, diver
 
 def adversarial_div_integ_bound(region : Rectangle, volume_of_encl_region : float, divergence_at_center : float, divergence_lipschitz_bounds : np.ndarray):
     """
-    Calculate the adversarial "worst case" integral of the divergence over the negative space around an enclosed region
+    Calculate the adversarial "worst case" lower bound of the integral of the divergence over the negative space around an enclosed region
     """
     # Scale the region such that each pyramidal facet has slope 1
     scaled_region, volume_change = scale_nd_rectangle(region, divergence_lipschitz_bounds)
 
-    volume_of_negative_space = (region.volume() - volume_of_encl_region) / volume_change
-    integral = adversarial_integral(scaled_region, 1, divergence_at_center, volume_of_negative_space)
+    scaled_volume_of_encl_region = volume_of_encl_region / volume_change
+    integral = adversarial_integral(scaled_region, 1, divergence_at_center, scaled_volume_of_encl_region)
     return integral * volume_change
 
 def smart_box_flow_algo(target_region : Rectangle, vf : VelocityField, dt : float, timesteps : int, jacobian_bound : np.ndarray, divergence_lipschitz_bounds : np.ndarray, divergence_integrator = min_div_integ_bound, erf_space = False, axes : list[plt.Axes] = None):
@@ -219,12 +221,12 @@ def smart_box_flow_algo(target_region : Rectangle, vf : VelocityField, dt : floa
 
             new_region_maxes[i] += (vi_center_u + extremum) * dt
             new_region_mins[i] += (vi_center_l - extremum) * dt
-            #print("extremum: ", extremum)
-            #print("vi_center_u: ", vi_center_u, " center_l: ", vi_center_l)
-            #print(" dim ", i, " new bounds: ", new_region_mins[i], " ", new_region_maxes[i])
-            #input("...")
+
+            # Constrain the region to within the erf box
+            if erf_space:
+                new_region_maxes[i] = min(new_region_maxes[i], 1)
+                new_region_mins[i] = max(new_region_mins[i], 0)
         
-        #print("output region: ", new_region_mins, ", ", new_region_maxes)
         return Rectangle(maxes=new_region_maxes, mins=new_region_mins)
 
     if axes is not None:
@@ -233,7 +235,8 @@ def smart_box_flow_algo(target_region : Rectangle, vf : VelocityField, dt : floa
 
     region_t = copy.deepcopy(target_region)
 
-    true_region_vol_bound = target_region.volume()
+    # Keep track of a upper bound on the volume of the true region
+    true_region_vol_upper_bound = target_region.volume()
 
     for k in range(timesteps, -1, -1):
         # Visualize current region
@@ -245,18 +248,19 @@ def smart_box_flow_algo(target_region : Rectangle, vf : VelocityField, dt : floa
 
         if k > 0:
             center_point = 0.5 * (region_t.maxes - region_t.mins)
-            negative_space_div = divergence_integrator(region_t, true_region_vol_bound, vf.divergence(center_point), divergence_lipschitz_bounds)
-            print(" - negative space div (md): ", min_div_integ_bound(region_t, true_region_vol_bound, vf.divergence(center_point), divergence_lipschitz_bounds), " (ad): ", adversarial_div_integ_bound(region_t, true_region_vol_bound, vf.divergence(center_point), divergence_lipschitz_bounds))
-            true_region_vol_bound += dt * (vf.volume_time_derivative(region_t) - negative_space_div)
+            negative_space = region_t.volume() - true_region_vol_upper_bound
+            negative_space_div = divergence_integrator(region_t, negative_space, vf.divergence(center_point), divergence_lipschitz_bounds)
+            print(" - negativespace div (md): ", min_div_integ_bound(region_t, negative_space, vf.divergence(center_point), divergence_lipschitz_bounds), " (ad): ", adversarial_div_integ_bound(region_t, negative_space, vf.divergence(center_point), divergence_lipschitz_bounds))
+            true_region_vol_upper_bound += dt * (vf.volume_time_derivative(region_t) - negative_space_div) 
 
             region_t = propagate_region(region_t)
         else:
             #print("Integrating over region: ", region_t, " probability: ", std_gaussian_integral_hyperrectangle(region_t))
             #print("true region vol bound: ", true_region_vol_bound, " region_t volume: ", region_t.volume())
             if not erf_space:
-                return std_gaussian_integral_hyperrectangle(region_t) - (region_t.volume() - true_region_vol_bound) * std_gaussian_pdf_min_val(region_t)
+                return std_gaussian_integral_hyperrectangle(region_t) - (region_t.volume() - true_region_vol_upper_bound) * std_gaussian_pdf_min_val(region_t)
             else:
-                return true_region_vol_bound
+                return true_region_vol_upper_bound
         
 def evaluate_on_grid(target_region : Rectangle, resolution : int, algorithm, axes=None):
     if isinstance(resolution, int):

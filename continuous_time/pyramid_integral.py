@@ -28,6 +28,7 @@ def adversarial_integral(region : Rectangle, facet_slope : float, apex_value : f
     """
     Calculate the adversarial integral of a chopped hyperpyramid (prism) with equal facet slope in each dimension.
     """
+    #print("target reigion vol: ", target_region_volume, " region vol: ", region.volume())
     total_volume = region.volume()
     assert target_region_volume <= total_volume 
 

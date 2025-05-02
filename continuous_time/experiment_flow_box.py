@@ -60,8 +60,8 @@ if __name__ == "__main__":
     #divergence_lipschitz_bounds = np.array([0, 0])
 
     vf = VelocityField(x, [box_u0, box_u1])
-    dt = 0.05
-    timesteps = 30
+    dt = 0.01
+    timesteps = 10
 
     target_region = Rectangle(mins=[1, 1], maxes=[2, 2])
 
@@ -93,12 +93,12 @@ if __name__ == "__main__":
     # Show the PDF
     fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
 
-    visualize_2D_pdf(ax, vf, dt, timesteps, bounds=fig_bounds)
+    #visualize_2D_pdf(ax, vf, dt, timesteps, bounds=fig_bounds, erf_space=True)
 
     # Compute integrals
-    P_mc = integrators.mc_prob(target_region, vf, dt, timesteps, 10000)
+    P_mc = integrators.mc_prob(target_region, vf, dt, timesteps, 10000, erf_space=True)
     print("Monte Carlo probability:            ", P_mc)
-    P_vegas = integrators.density_mc_integral(target_region, vf, dt, timesteps, 5000)
+    P_vegas = integrators.density_mc_integral(target_region, vf, dt, timesteps, 5000, erf_space=True)
     print("Vegas integral probability:         ", P_vegas)
 
     # Naive box algorithm
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     #for ax in axes:
     #    vf.visualize(ax, fig_bounds)
     axes = None
-    P_box_algo_naive = naive_box_flow_algo(target_region, vf, dt, timesteps, box_velocity_jacobian_bound, axes=axes)
+    P_box_algo_naive = naive_box_flow_algo(target_region, vf, dt, timesteps, box_velocity_jacobian_bound, axes=axes, erf_space=True)
     print("Naive box algo probability:         ", P_box_algo_naive)
 
     # Smart box algorithm
