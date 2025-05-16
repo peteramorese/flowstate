@@ -83,7 +83,13 @@ def visualize_2D_pdf(ax : plt.Axes, vf : VelocityField, dt : float, timesteps : 
     Z = np.zeros_like(X0)
     for i in range(X0.shape[0]):
         for j in range(X0.shape[1]):
-            Z[i, j] = pdf(np.array([X0[i, j], X1[i, j]]), vf, dt, timesteps, erf_space=erf_space)
+            x = np.array([X0[i, j],X1[i, j]])
+            if erf_space:
+                u = std_gaussian_cdf(x)
+                Z[i, j] = standard_multivariate_gaussian_pdf(x) * pdf(np.array(u), vf, dt, timesteps, erf_space=erf_space)
+            else:
+                Z[i, j] = pdf(np.array(x), vf, dt, timesteps, erf_space=erf_space)
+             
     
     #ax.contourf(X0, X1, Z, levels=100, cmap='viridis')
     ax.plot_surface(X0, X1, Z, vmin=0, vmax=Z.max(), cmap='magma')

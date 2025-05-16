@@ -174,9 +174,8 @@ def min_div_integ_bound(region : Rectangle, volume_of_encl_region : float, diver
         if extremum_l > extremum:
             extremum = extremum_l
 
-    volume_of_negative_space = region.volume() - volume_of_encl_region
     min_divergence = divergence_at_center - extremum
-    return volume_of_negative_space * min_divergence
+    return volume_of_encl_region * min_divergence
 
 def adversarial_div_integ_bound(region : Rectangle, volume_of_encl_region : float, divergence_at_center : float, divergence_lipschitz_bounds : np.ndarray):
     """
@@ -250,16 +249,21 @@ def smart_box_flow_algo(target_region : Rectangle, vf : VelocityField, dt : floa
             center_point = 0.5 * (region_t.maxes - region_t.mins)
             negative_space = region_t.volume() - true_region_vol_upper_bound
             negative_space_div = divergence_integrator(region_t, negative_space, vf.divergence(center_point), divergence_lipschitz_bounds)
-            print(" - negativespace div (md): ", min_div_integ_bound(region_t, negative_space, vf.divergence(center_point), divergence_lipschitz_bounds), " (ad): ", adversarial_div_integ_bound(region_t, negative_space, vf.divergence(center_point), divergence_lipschitz_bounds))
+            #print(" - negativespace div (md): ", min_div_integ_bound(region_t, negative_space, vf.divergence(center_point), divergence_lipschitz_bounds), " (ad): ", adversarial_div_integ_bound(region_t, negative_space, vf.divergence(center_point), divergence_lipschitz_bounds))
+            #print("Vol: ", region_t.volume(), " true vol bound: ", true_region_vol_upper_bound, " neg vol: ", negative_space," total div: ", vf.volume_time_derivative(region_t), " negative space div: ", negative_space_div)
+            if vf.volume_time_derivative(region_t) < negative_space_div:
+                print("WARNING: volume time derivative is less than the divergence bound")
             true_region_vol_upper_bound += dt * (vf.volume_time_derivative(region_t) - negative_space_div) 
 
             region_t = propagate_region(region_t)
+            #input("...")
         else:
             #print("Integrating over region: ", region_t, " probability: ", std_gaussian_integral_hyperrectangle(region_t))
             #print("true region vol bound: ", true_region_vol_bound, " region_t volume: ", region_t.volume())
             if not erf_space:
                 return std_gaussian_integral_hyperrectangle(region_t) - (region_t.volume() - true_region_vol_upper_bound) * std_gaussian_pdf_min_val(region_t)
             else:
+                print("region_t volume: ", region_t.volume(), " true region vol bound: ", true_region_vol_upper_bound)
                 return true_region_vol_upper_bound
         
 def evaluate_on_grid(target_region : Rectangle, resolution : int, algorithm, axes=None):

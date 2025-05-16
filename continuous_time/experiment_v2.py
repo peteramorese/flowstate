@@ -28,7 +28,7 @@ if __name__ == "__main__":
 
     jacobian_bound = np.abs(np.array([
         [1/4 * a00, 1],             # L(v0 wrt x0), L(v0 wrt x1)
-        [1/4 * a10, 1/4 * a11]      # L(v1 wrt x0), L(v1 wrt x1)
+        [a10, 1/4 * a11]      # L(v1 wrt x0), L(v1 wrt x1)
     ]))
     divergence_lipschitz_bounds = np.abs(np.array([
         0.1 * a00 + 0,              # L(div(v) wrt x0) = L(dv0dx0 wrt x0) + L(dv1dx1 wrt x0)
