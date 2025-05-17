@@ -89,14 +89,13 @@ function poly_regression(polyvars, X::Matrix{Float64}, y::Vector{Float64}; deg::
     return p
 end
 
-# Fit constrained polynomial model
-function fit_constrained_polynomial(X_u, Y_u, degree)
+function system_regression(X_u, Y_u, degree)
     @assert size(X_u) == size(Y_u)
 
     d = size(X_u, 2)
     @polyvar x[1:d]
 
-    models = Vector{Tuple{Vector{Float64}, PolynomialBasis}}()
+    model = Vector{Polynomial}()
     
     bc_scaling = 1 ./(X_u .* (1 .- X_u))
     Y_u_unconst = Y_u .* bc_scaling
@@ -105,9 +104,9 @@ function fit_constrained_polynomial(X_u, Y_u, degree)
         y = Y_u_unconst[:, i]
         p = poly_regression(x, X_u, y, deg=degree) 
         
-        push!(models, p)
+        push!(model, p)
     end
-    return models
+    return model
 end
 
 
