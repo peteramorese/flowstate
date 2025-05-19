@@ -3,6 +3,8 @@ using MultivariatePolynomials
 using LazySets
 using IterTools
 using Plots
+using Distributions
+using LinearAlgebra
 pyplot()
 
 struct SystemModel
@@ -117,17 +119,43 @@ function visualize_2D_pdf(pdf::Function, xlim, ylim; n_points::Int=100)
                    title="Density")
 end
 
-function visualize_2D_pdf(model::SystemModel, t_eval::Float64; n_points::Int=100, n_timesteps::Int=100, erf_space=true)
-    function pdf(x_eval::Vector{Float64})
+function visualize_2D_erf_space_pdf(model::SystemModel, t_eval::Float64; n_points::Int=100, n_timesteps::Int=100)
+    function euler_pdf(x_eval::Vector{Float64})
         return euler_density(x_eval, t_eval, model, n_timesteps)
     end
-    return visualize_2D_pdf(pdf, (0, 1), (0, 1), n_points=n_points)
+    return visualize_2D_pdf(euler_pdf, (0, 1), (0, 1), n_points=n_points)
+end
+
+function visualize_2D_pdf(model::SystemModel, t_eval::Float64, xlim, ylim; n_points::Int=100, n_timesteps::Int=100)
+    d = Normal(0, 1)
+    function euler_pdf(x_eval::Vector{Float64})
+        u_eval = cdf.(d, x_eval)
+        volume_change = prod(pdf.(d, x_eval))
+        return volume_change * euler_density(u_eval, t_eval, model, n_timesteps)
+    end
+    return visualize_2D_pdf(euler_pdf, xlim, ylim, n_points=n_points)
+end
+
+function visualize_2D_erf_space_vf(model::SystemModel; n_points::Int=100, scale::Float64=0.1)
+    # Create grid points
+    xvals = range(0, 1, length=n_points)
+    yvals = range(0, 1, length=n_points)
+    X, Y = repeat(xvals, outer=length(yvals)), repeat(yvals, inner=length(xvals))
+    #print("X: ", X)
+    inputs = @. (X, Y)
+    
+    f1_values = [convert(Float64, subs(model.f[1], Tuple(model.x_vars) => Tuple([x, y]))) for (x, y) in zip(X, Y)]
+    f2_values = [convert(Float64, subs(model.f[2], Tuple(model.x_vars) => Tuple([x, y]))) for (x, y) in zip(X, Y)]
+
+    return Plots.quiver(X, Y, quiver=(scale * f1_values, scale * f2_values); 
+                   xlabel="x_1", ylabel="x_2", 
+                   title="System Vector Field")
 end
 
 @polyvar x[1:2]
 @polyvar t
 
-f1 = (x[1] * (x[1] - 1)) * (x[1]^2 + x[1]*x[2]^2)
+f1 = (x[1] * (x[1] - 1)) * (-x[1]^2 + x[1]*x[2]^2)
 f2 = (x[2] * (x[2] - 1)) * (x[1] + 2 * x[2] * x[1])
 #f1 = (x[1]^2 + x[1]*x[2]^2)
 #f2 = (x[1] + 2 * x[2] * x[1])
@@ -140,4 +168,7 @@ println("f2: ", f2)
 #density = euler_density([.5, .5], 1.0, model)
 #println("Euler density: ", density)
 
-visualize_2D_pdf(model, 0.1, (0.0, 1.0), (0.0, 1.0), n_points=20, n_timesteps=100)
+p_vf = visualize_2D_erf_space_vf(model, n_points=30)
+#p_erf = visualize_2D_erf_space_pdf(model, 1.0, n_points=30, n_timesteps=500)
+#p_ss = visualize_2D_pdf(model, 1.0, (-3.0, 3.0), (-3.0, 3.0), n_points=30, n_timesteps=500)
+#plot(p_vf, p_erf, p_ss, layout=(1,3))
