@@ -30,25 +30,16 @@ function visualize_data(X, Y, title="")
     display(plot!(p1, p2, layout=(1, 2), size=(800, 400), title=title))
 end
 
-function plot_polynomial_surface(p, x, y, xlim, ylim; npoints=50, kwargs...)
+function plot_polynomial_surface(p, x, y, xlim, ylim; n_points=50, kwargs...)
     # Create grid points
-    xvals = range(xlim[1], xlim[2], length=npoints)
-    yvals = range(ylim[1], ylim[2], length=npoints)
+    xvals = range(xlim[1], xlim[2], length=n_points)
+    yvals = range(ylim[1], ylim[2], length=n_points)
     
-    # Create a matrix to store evaluated values
-    z_values = Matrix{Float64}(undef, npoints, npoints)
-    
-    # Evaluate polynomial at each grid point
-    for (i, x_val) in enumerate(xvals)
-        for (j, y_val) in enumerate(yvals)
-            # Create substitution and evaluate
-            subs = [x => x_val, y => y_val]
-            z_values[i, j] = p(subs...)
-        end
-    end
+    # Store z values in matrix
+    z_values = [p(x => x_val, y => y_val) for y_val in yvals, x_val in xvals]
     
     # Create the surface plot
-    return surface(xvals, yvals, z_values; 
+    return Plots.surface(xvals, yvals, z_values; 
                    xlabel="$(x)", ylabel="$(y)", zlabel="p($(x),$(y))",
                    title="Polynomial Surface: $p",
                    kwargs...)
@@ -103,8 +94,8 @@ function system_regression(X_u, Y_u, degree)
     for i in 1:n
         y = Y_u_unconst[:, i]
         p = poly_regression(x, X_u, y, deg=degree) 
-        
-        push!(model, p)
+        p_bc = x[i] * (1 - x[i]) * p 
+        push!(model, p_bc)
     end
     return model
 end
@@ -144,13 +135,13 @@ end
 
 
 
-
-
+#@polyvar x[1:2]
+#
 #X = randn(n, 2)
 #y = .4 * X[:,1].^3 + 2 * X[:,2].^2 .+ 5 .+ 0.1 * randn(n)
 #
 ## Perform polynomial regression
-#x, p = poly_regression(X, y, deg=3)
+#p = poly_regression(x[1:2], X, y, deg=3)
 #
 #p_true = .4 * x[1]^3 + 2 * x[2]^2 .+ 5
 #
